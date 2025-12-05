@@ -1,123 +1,71 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./ClaimGenie.css";
 
-function formatExtractedData(data) {
-    if (!data) return "";
-
-    const mapper = {
-        claimant_name: "Claimant Name",
-        policy_number: "Policy Number",
-        claim_type: "Claim Type",
-        incident_date: "Incident Date",
-        incident_location: "Incident Location",
-        claim_amount: "Claim Amount",
-        service_provider: "Service Provider",
-        description_of_loss: "Description of Loss"
-    };
-
-    return Object.keys(mapper)
-        .map((key) => {
-            const label = mapper[key];
-            const value = data[key] ?? "Not Provided";
-            return `• ${label}: ${value}`;
-        })
-        .join("\n");
-}
-
-function formatValidationSummary(validation) {
-    if (!validation) return "";
-
-    const { missingFields, invalidFields, summary } = validation;
-
-    let output = "";
-
-    // if (missingFields?.length > 0) {
-    //     output += `⚠️ The following required fields are missing:\n`;
-    //     missingFields.forEach((f) => {
-    //         output += `   - ${f}\n`;
-    //     });
-    //     output += `\n`;
-    // }
-
-    // if (invalidFields?.length > 0) {
-    //     output += `❌ Invalid field values detected:\n`;
-    //     invalidFields.forEach((f) => {
-    //         output += `   - ${f.field}: ${f.reason}\n`;
-    //     });
-    //     output += `\n`;
-    // }
-
-    output += `📄 Summary:\n${summary}`;
-
-    return output;
-}
-
 export default function ClaimGenie() {
-    const [text, setText] = useState("");
-    const [extracted, setExtracted] = useState(null);
-    const [validation, setValidation] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [messages, setMessages] = useState([
+        { sender: "bot", text: "Hi, I am ClaimGenie. Please enter your policy number." }
+    ]);
+    const [input, setInput] = useState("");
+    const [sessionId, setSessionId] = useState(null);
 
-    const processClaim = async () => {
-        setLoading(true);
-        setExtracted(null);
-        setValidation(null);
+    const chatEnd = useRef(null);
+
+    useEffect(() => {
+        chatEnd.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    async function sendMessage() {
+        if (!input.trim()) return;
+
+        setMessages(prev => [...prev, { sender: "user", text: input }]);
+
+        const payload = {
+            message: input,
+            sessionId: sessionId
+        };
+
+        setInput("");
 
         try {
-            const extractRes = await axios.post("https://zany-engine-97w7wpjg94w93xgjj-5000.app.github.dev/api/extract", {
-                text,
-            });
-            const extractedData = extractRes.data.extracted;
-            setExtracted(extractedData);
+            const res = await axios.post("https://zany-engine-97w7wpjg94w93xgjj-5000.app.github.dev/api/chat", payload);
+            const { reply, sessionId: returnedId } = res.data;
 
-            const validateRes = await axios.post(
-                "https://zany-engine-97w7wpjg94w93xgjj-5000.app.github.dev/api/validate",
-                { extracted: extractedData }
-            );
-            setValidation(validateRes.data.validation);
+            if (!sessionId) setSessionId(returnedId);
+
+            setMessages(prev => [...prev, { sender: "bot", text: reply }]);
         } catch (err) {
-            console.error("Processing error:", err);
-            alert("Error processing claim. Check server logs.");
+            setMessages(prev => [...prev, {
+                sender: "bot",
+                text: "Something went wrong."
+            }]);
         }
-
-        setLoading(false);
-    };
+    }
 
     return (
-        <div>
-            <h1 className="title">ClaimGenie</h1>
-            <div className="claim-genie-container">
-                <textarea
-                    className="input-box"
-                    placeholder="Paste claim description text here..."
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
+        <div className="chat-container">
+            <div className="header">ClaimGenie</div>
+            <div className="chat-body">
+                {messages.map((msg, index) => (
+                    <div key={index} className={`bubble ${msg.sender}`}>
+                        {msg.text.split("\n").map((line, i) => (
+                            <div key={i}>{line}</div>
+                        ))}
+                    </div>
+                ))}
+                <div ref={chatEnd}></div>
+            </div>
+
+            <div className="input-area">
+                <input
+                    className="chat-input"
+                    value={input}
+                    placeholder="Type a message..."
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && sendMessage()}
                 />
-
-                <button className="submit-btn" onClick={processClaim} disabled={loading}>
-                    {loading ? "Processing..." : "Validate Claim"}
-                </button>
-
-                {extracted && (
-                    <div className="section">
-                        <h2 className="section-title">Claim Details</h2>
-                        <pre className="summary-box">
-                            {formatExtractedData(extracted)}
-                        </pre>
-                    </div>
-                )}
-
-                {validation && (
-                    <div className="section">
-                        <h2 className="section-title">Summary</h2>
-                        <pre className="summary-box">
-                            {formatValidationSummary(validation)}
-                        </pre>
-                    </div>
-                )}
+                <button className="send-btn" onClick={sendMessage}>➤</button>
             </div>
         </div>
-
     );
 }
