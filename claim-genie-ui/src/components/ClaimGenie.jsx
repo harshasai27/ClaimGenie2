@@ -1,71 +1,86 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./ClaimGenie.css";
 
+const API_URL = "https://zany-engine-97w7wpjg94w93xgjj-5000.app.github.dev/api/chat";
+
 export default function ClaimGenie() {
-    const [messages, setMessages] = useState([
-        { sender: "bot", text: "Hi, I am ClaimGenie. Please enter your policy number." }
-    ]);
-    const [input, setInput] = useState("");
-    const [sessionId, setSessionId] = useState(null);
+  const [messages, setMessages] = useState([
+    {
+      from: "bot",
+      text: "Hi, I am ClaimGenie. Please enter your policy number.",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [sessionId, setSessionId] = useState(null);
+  const bottomRef = useRef(null);
 
-    const chatEnd = useRef(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-    useEffect(() => {
-        chatEnd.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const text = input.trim();
+    setInput("");
 
-    async function sendMessage() {
-        if (!input.trim()) return;
+    setMessages((prev) => [...prev, { from: "user", text }]);
 
-        setMessages(prev => [...prev, { sender: "user", text: input }]);
+    try {
+      const res = await axios.post(API_URL, {
+        message: text,
+        sessionId,
+      });
 
-        const payload = {
-            message: input,
-            sessionId: sessionId
-        };
+      if (!sessionId) setSessionId(res.data.sessionId);
 
-        setInput("");
-
-        try {
-            const res = await axios.post("https://zany-engine-97w7wpjg94w93xgjj-5000.app.github.dev/api/chat", payload);
-            const { reply, sessionId: returnedId } = res.data;
-
-            if (!sessionId) setSessionId(returnedId);
-
-            setMessages(prev => [...prev, { sender: "bot", text: reply }]);
-        } catch (err) {
-            setMessages(prev => [...prev, {
-                sender: "bot",
-                text: "Something went wrong."
-            }]);
-        }
+      setMessages((prev) => [...prev, { from: "bot", text: res.data.reply }]);
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          from: "bot",
+          text: "Something went wrong while contacting the server. Please try again.",
+        },
+      ]);
     }
+  };
 
-    return (
-        <div className="chat-container">
-            <div className="header">ClaimGenie</div>
-            <div className="chat-body">
-                {messages.map((msg, index) => (
-                    <div key={index} className={`bubble ${msg.sender}`}>
-                        {msg.text.split("\n").map((line, i) => (
-                            <div key={i}>{line}</div>
-                        ))}
-                    </div>
-                ))}
-                <div ref={chatEnd}></div>
-            </div>
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
-            <div className="input-area">
-                <input
-                    className="chat-input"
-                    value={input}
-                    placeholder="Type a message..."
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && sendMessage()}
-                />
-                <button className="send-btn" onClick={sendMessage}>➤</button>
+  return (
+    <div className="cg-app">
+      <div className="cg-chat-card">
+        <div className="cg-header">ClaimGenie</div>
+
+        <div className="cg-messages">
+          {messages.map((m, idx) => (
+            <div key={idx} className={`cg-bubble ${m.from}`}>
+              {m.text}
             </div>
+          ))}
+          <div ref={bottomRef} />
         </div>
-    );
+
+        <div className="cg-input-row">
+          <input
+            className="cg-input"
+            placeholder="Type a message..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <button className="cg-send-btn" onClick={sendMessage}>
+            ▶
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

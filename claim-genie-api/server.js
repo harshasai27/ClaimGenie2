@@ -1,6 +1,3 @@
-// ClaimGenie Chatbot - FINAL WORKING BACKEND (Manual JSON Parser + Intelligent Extraction)
-// ---------------------------------------------------------------------------------------
-
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -17,9 +14,23 @@ const client = new OpenAI({
 });
 
 if (!process.env.OPENAI_API_KEY) {
-  console.error("❌ Missing OPENAI_API_KEY in .env");
+  console.error("Missing OPENAI_API_KEY in .env");
   process.exit(1);
 }
+
+const FIELD_LABELS = {
+  claimant_name: "Claimant Name",
+  policy_number: "Policy Number",
+  claim_type: "Claim Type",
+  incident_date: "Incident Date",
+  incident_location: "Incident Location",
+  claim_amount: "Claim Amount",
+  service_provider: "Service Provider",
+  description_of_loss: "Description of Loss",
+};
+
+const REQUIRED_FIELDS = Object.keys(FIELD_LABELS);
+
 
 const sessions = {};
 
@@ -28,8 +39,8 @@ function newSession() {
     state: "awaiting_policy_number",
     policyNumber: null,
     userDetails: null,
-    extracted: null,
-    missingFields: []
+    claimData: {},
+    missingFields: [],
   };
 }
 
@@ -49,115 +60,75 @@ const mockPolicyData = {
 };
 
 
-function formatSummary(data) {
-  const labels = {
-    claimant_name: "Claimant Name",
-    policy_number: "Policy Number",
-    claim_type: "Claim Type",
-    incident_date: "Incident Date",
-    incident_location: "Incident Location",
-    claim_amount: "Claim Amount",
-    service_provider: "Service Provider",
-    description_of_loss: "Description of Loss",
-  };
-
-  return Object.keys(labels)
-    .map((key) => `${labels[key]}: ${data[key] ?? "Not Provided"}`)
-    .join("\n");
-}
-
-
 function safeParseJSON(message) {
   if (!message) return null;
-
-  if (message.parsed) {
-    return message.parsed;
-  }
+  if (message.parsed) return message.parsed;
 
   if (message.content) {
     try {
-      const txt = message.content
+      const cleaned = message.content
         .replace(/```json/gi, "")
         .replace(/```/g, "")
         .trim();
-      return JSON.parse(txt);
-    } catch (e) {
-      console.log("Could not parse message.content manually");
+      return JSON.parse(cleaned);
+    } catch {
+      console.log("⚠ JSON parse failed from content");
     }
   }
-
   return null;
 }
 
-async function extractClaim(text) {
+function validateClaimJS(data) {
+  const missing = REQUIRED_FIELDS.filter((f) => !data[f]);
+  return { missing, cleaned: data };
+}
+
+function formatSummary(data) {
+  return REQUIRED_FIELDS
+    .map((f) => `${FIELD_LABELS[f]}: ${data[f] ?? "Not Provided"}`)
+    .join("\n");
+}
+
+async function extractClaimFlexible(text, defaults = {}) {
   try {
     const completion = await client.chat.completions.create({
-      model: "gpt-4.1-mini", 
+      model: "gpt-4.1-mini",
       temperature: 0.1,
-      max_tokens: 400,
       messages: [
         {
           role: "system",
           content: `
-You are an insurance claims extraction engine.
-Always return ONLY a valid JSON object. No explanations.
-Infer missing values intelligently.
+You extract claim fields from flexible user input. User may:
+- describe incident in a paragraph
+- use labels like "Claimant Name:", "Incident Date - 10/10/2025"
+- mix labels & natural language
+
+Return ONLY JSON with keys:
+
+{
+  "claimant_name": string | null,
+  "policy_number": string | null,
+  "claim_type": string | null,
+  "incident_date": string | null,
+  "incident_location": string | null,
+  "claim_amount": number | null,
+  "service_provider": string | null,
+  "description_of_loss": string | null
+}
+
+Infer values where possible. If unknown, use null.
 `
         },
         {
           role: "user",
-          content: `
-Extract the claim information using exactly this structure:
-
-{
-  "claimant_name": "",
-  "policy_number": "",
-  "claim_type": "",
-  "incident_date": "",
-  "incident_location": "",
-  "claim_amount": "",
-  "service_provider": "",
-  "description_of_loss": ""
-}
-
-Rules:
-- Infer claim_type from context (bike accident → motor).
-- Convert amounts like "10k", "5000 rupees", "five thousand" → number.
-- Accept ANY date format.
-- Convert "garage/workshop/mechanic" → service_provider.
-- Summarize the damage in 1 line.
-
-Text:
-"${text}"
-
-Return ONLY THE JSON OBJECT.
-`
-        }
-      ]
+          content: text,
+        },
+      ],
     });
 
     const parsed = safeParseJSON(completion.choices[0].message);
 
-    if (!parsed) {
-      console.log("⚠️ Extraction fallback triggered");
-      return {
-        claimant_name: null,
-        policy_number: null,
-        claim_type: null,
-        incident_date: null,
-        incident_location: null,
-        claim_amount: null,
-        service_provider: null,
-        description_of_loss: null
-      };
-    }
-
-    return parsed;
-
-  } catch (err) {
-    console.error("🔥 extractClaim failed:", err.message);
-
-    return {
+    const base = {
       claimant_name: null,
       policy_number: null,
       claim_type: null,
@@ -165,89 +136,73 @@ Return ONLY THE JSON OBJECT.
       incident_location: null,
       claim_amount: null,
       service_provider: null,
-      description_of_loss: null
-    };
-  }
-}
-
-async function validateClaim(extracted) {
-  try {
-    // Determine missing fields directly
-    const required = [
-      "claimant_name",
-      "policy_number",
-      "claim_type",
-      "incident_date",
-      "incident_location",
-      "claim_amount",
-      "service_provider",
-      "description_of_loss"
-    ];
-
-    const missing = required.filter(f => !extracted[f]);
-
-    return {
-      validFields: required.filter(f => extracted[f]),
-      missingFields: missing,
-      cleanedData: extracted   // NEVER override extracted values
+      description_of_loss: null,
     };
 
+    return { ...base, ...(parsed || {}), ...defaults };
   } catch (err) {
-    console.error("🔥 validateClaim() failed:", err.message);
-
-    const required = [
-      "claimant_name",
-      "policy_number",
-      "claim_type",
-      "incident_date",
-      "incident_location",
-      "claim_amount",
-      "service_provider",
-      "description_of_loss"
-    ];
-
+    console.error("🔥 extractClaimFlexible error:", err.message);
     return {
-      validFields: required.filter(f => extracted[f]),
-      missingFields: required.filter(f => !extracted[f]),
-      cleanedData: extracted
+      claimant_name: defaults.claimant_name ?? null,
+      policy_number: defaults.policy_number ?? null,
+      claim_type: null,
+      incident_date: null,
+      incident_location: null,
+      claim_amount: null,
+      service_provider: null,
+      description_of_loss: null,
     };
   }
 }
 
-
-async function fillMissingFields(extracted, missingFields, userMsg) {
+async function fillMissingAI(currentData, missing, text) {
   try {
     const completion = await client.chat.completions.create({
       model: "gpt-4.1-mini",
+      temperature: 0.1,
       messages: [
+        {
+          role: "system",
+          content: `
+You fill ONLY missing fields of a claim JSON using user's follow-up message.
+
+Rules:
+- Only update fields listed in "missingFields".
+- Never clear or overwrite existing non-null fields.
+- Return FULL JSON with all 8 keys.
+`
+        },
         {
           role: "user",
           content: `
-Fill ONLY the missing fields:
-
-Missing:
-${JSON.stringify(missingFields)}
-
 Current JSON:
-${JSON.stringify(extracted, null, 2)}
+${JSON.stringify(currentData, null, 2)}
 
-User text:
-"${userMsg}"
+Missing fields:
+${JSON.stringify(missing)}
 
-Return updated JSON only.
+User message:
+"${text}"
+
+Update only clearly provided missing fields. Return ONLY the full JSON object.
 `
-        }
-      ]
+        },
+      ],
     });
 
     const parsed = safeParseJSON(completion.choices[0].message);
+    if (!parsed || typeof parsed !== "object") return currentData;
 
-    if (!parsed) return extracted;
-    return parsed;
-
+    const updated = { ...currentData };
+    REQUIRED_FIELDS.forEach((f) => {
+      if (parsed[f] !== undefined && parsed[f] !== null) {
+        updated[f] = parsed[f];
+      }
+    });
+    return updated;
   } catch (err) {
-    console.error("🔥 fillMissingFields failed:", err.message);
-    return extracted;
+    console.error("🔥 fillMissingAI error:", err.message);
+    return currentData;
   }
 }
 
@@ -257,21 +212,19 @@ async function handleMessage(session, message) {
 
   if (/^(restart|reset)$/i.test(msg)) {
     Object.assign(session, newSession());
-    return "Conversation restarted.\nPlease enter your policy number.";
+    return "Conversation restarted.\nPlease enter your Policy Number.";
   }
 
   if (session.state === "awaiting_policy_number") {
     session.policyNumber = msg;
-
     session.userDetails = {
       ...mockPolicyData,
-      policyNumber: msg
+      policyNumber: msg,
     };
-
     session.state = "confirm_new_claim";
 
     return (
-      `Here are your policy details:\n` +
+      `Thank you! Here are your policy details:\n` +
       `Name: ${session.userDetails.name}\n` +
       `Policy Type: ${session.userDetails.policyType}\n` +
       `Policy Number: ${session.policyNumber}\n` +
@@ -281,72 +234,99 @@ async function handleMessage(session, message) {
   }
 
   if (session.state === "confirm_new_claim") {
-    if (msg.toLowerCase().startsWith("y")) {
-      session.state = "awaiting_incident_text";
-      return "Please describe the incident in one message.";
+    const lower = msg.toLowerCase();
+    if (lower.startsWith("y")) {
+      session.state = "awaiting_claim_details";
+      return (
+        "Great! Please provide your claim details in one message.\n\n" +
+        "You can either:\n" +
+        "• Describe the incident in a paragraph, OR\n" +
+        "• Provide labeled fields like:\n\n" +
+        "Claimant Name: \n" +
+        "Incident Date: \n" +
+        "Incident Location:\n" +
+        "Claim Type: \n" +
+        "Claim Amount:\n" +
+        "Service Provider: \n" +
+        "Description of Loss: \n\n" +
+        "I will extract the required details automatically."
+      );
     }
-    if (msg.toLowerCase().startsWith("n")) {
-      return "Okay. Type restart anytime.";
+    if (lower.startsWith("n")) {
+      session.state = "done_no_claim";
+      return "Okay, I will not file a new claim. If you change your mind, type 'restart' to begin again.";
     }
-    return "Please answer yes or no.";
+    return "Please answer 'yes' or 'no'.";
   }
 
-  if (session.state === "awaiting_incident_text") {
-    const extracted = await extractClaim(msg);
+  if (session.state === "awaiting_claim_details") {
+    const defaults = {
+      claimant_name: session.userDetails?.name ?? null,
+      policy_number: session.policyNumber ?? null,
+    };
 
-    extracted.claimant_name =
-      extracted.claimant_name || session.userDetails.name;
+    const claimData = await extractClaimFlexible(msg, defaults);
+    session.claimData = claimData;
 
-    extracted.policy_number =
-      extracted.policy_number || session.policyNumber;
+    const { missing } = validateClaimJS(claimData);
+    session.missingFields = missing;
 
-    session.extracted = extracted;
-
-    const validation = await validateClaim(extracted);
-    session.missingFields = validation.missingFields;
-
-    if (session.missingFields.length === 0) {
+    if (missing.length === 0) {
       session.state = "done";
       return (
-        formatSummary(validation.cleanedData) +
-        "\n\nThank you! Please wait for further communication."
+        formatSummary(claimData) +
+        "\n\nThank you! Your claim has been recorded. Please wait for further communication."
       );
     }
 
-    session.state = "awaiting_missing_fields";
-    return `I still need the following fields:\n${session.missingFields.join(
-      ", "
-    )}\n\nPlease provide them in one message.`;
+    session.state = "awaiting_missing";
+
+    return (
+      `Thank you! I captured most of your details.\n\n` +
+      `However, I still need:\n` +
+      `${missing.map((f) => FIELD_LABELS[f]).join(", ")}\n\n` +
+      `Please provide these missing details in one message. For example:\n` +
+      missing.map((f) => `${FIELD_LABELS[f]}: `).join("\n")
+    );
   }
 
-  if (session.state === "awaiting_missing_fields") {
-    const updated = await fillMissingFields(
-      session.extracted,
+  if (session.state === "awaiting_missing") {
+    const updated = await fillMissingAI(
+      session.claimData,
       session.missingFields,
       msg
     );
 
-    session.extracted = updated;
+    session.claimData = updated;
 
-    const validation = await validateClaim(updated);
-    session.missingFields = validation.missingFields;
+    const { missing } = validateClaimJS(updated);
+    session.missingFields = missing;
 
-    if (session.missingFields.length === 0) {
+    if (missing.length === 0) {
       session.state = "done";
       return (
-        formatSummary(validation.cleanedData) +
-        "\n\nThank you! Please wait for further communication."
+        formatSummary(updated) +
+        "\n\nThank you! Your claim has been recorded. Please wait for further communication."
       );
     }
 
     return (
-      `Thank you. Still missing: ${session.missingFields.join(
-        ", "
-      )}\n\nPlease provide them in one message.`
+      `Thanks! I still don't have complete information.\n\n` +
+      `Still missing:\n` +
+      `${missing.map((f) => FIELD_LABELS[f]).join(", ")}\n\n` +
+      `Please provide only these remaining details in your next message.`
     );
   }
 
-  return "Your claim is complete. Type restart to begin again.";
+  if (session.state === "done_no_claim") {
+    return "We are not filing a claim right now. Type 'restart' if you want to start again.";
+  }
+
+  if (session.state === "done") {
+    return "Your claim has already been recorded. Type 'restart' to file another claim.";
+  }
+
+  return "I'm not sure what to do. Please type 'restart' to start over.";
 }
 
 
@@ -359,14 +339,14 @@ app.post("/api/chat", async (req, res) => {
     const reply = await handleMessage(session, message);
 
     res.json({ sessionId, reply });
-
   } catch (err) {
-    console.error("🔥 Chat handler error:", err);
+    console.error("API error:", err);
     res.status(500).json({ reply: "Internal server error" });
   }
 });
 
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`ClaimGenie backend running at ${PORT}`);
+  console.log(` ClaimGenie API running at port ${PORT}`);
 });
