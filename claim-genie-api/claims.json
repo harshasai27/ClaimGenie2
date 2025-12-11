@@ -1,0 +1,16 @@
+{
+  "claims": [
+    {
+      "claimId": "CLM-1000",
+      "claimant_name": "John",
+      "policy_number": "P12564",
+      "claim_type": "bike accident",
+      "incident_date": "10/12/2025",
+      "incident_location": "madhapur",
+      "claim_amount": 5000,
+      "service_provider": "local garage",
+      "description_of_loss": "bike accident near madhapur",
+      "createdAt": "2025-12-10T11:18:57.293Z"
+    }
+  ]
+}

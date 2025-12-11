@@ -1,0 +1,31 @@
+{
+    "P12345" : {
+        "name":"John",
+        "policyType":"Motor Insurance",
+        "validTill":"2030-01-01",
+        "premium":"12,000",
+        "sumInsured":"3,00,000",
+        "vehicleModel":"Royal Enfield - Hunter 350",
+        "registrationNumber":"AB01AB1234",
+        "email":"john@gmail.com"
+    },
+    "P4567" : {
+        "name":"Peter",
+        "policyType":"Health Insurance",
+        "validTill":"2025-05-12",
+        "premium":"22,000",
+        "sumInsured":"10,00,000",
+        "hospitalNetwork":"Appolo, Yashoda, KIMS",
+        "email":"peter@gmail.com"
+    },
+    "P6542" : {
+        "name" : "Kevin",
+        "policyType" :"Motor Insurance",
+        "validTill" : "2020-01-01",
+        "premium":"18,500",
+        "sumInsured":"7,50,000",
+        "vehicleModel":"Hyundai Venue",
+        "registrationNumber":"AB02AB1890",
+        "email":"kevin@gmail.com"
+    }
+}
