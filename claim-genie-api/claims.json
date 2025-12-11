@@ -11,6 +11,30 @@
       "service_provider": "local garage",
       "description_of_loss": "bike accident near madhapur",
       "createdAt": "2025-12-10T11:18:57.293Z"
+    },
+    {
+      "claimId": "CLM-1001",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "bike accident",
+      "incident_date": "10/10/2024",
+      "incident_location": "kondapur",
+      "claim_amount": "5000",
+      "service_provider": "local garage",
+      "description_of_loss": "bike accident repair costs",
+      "createdAt": "2025-12-11T09:50:31.776Z"
+    },
+    {
+      "claimId": "CLM-1002",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "bike accident",
+      "incident_date": "10/20/2025",
+      "incident_location": "near jubilee hills",
+      "claim_amount": "10000",
+      "service_provider": "local garage",
+      "description_of_loss": "head light and bumper damage",
+      "createdAt": "2025-12-11T09:57:07.599Z"
     }
   ]
 }

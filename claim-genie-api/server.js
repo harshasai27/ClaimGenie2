@@ -1,3 +1,17 @@
+// ============================================
+// ClaimGenie Backend (Full Working Version)
+// Supports:
+// ✔ Multiple policies JSON
+// ✔ Invalid/expired policy detection
+// ✔ Global "retrieve claim" command ANYTIME
+// ✔ Flexible AI extraction (labels + natural language)
+// ✔ Future incident date validation
+// ✔ Missing field loop
+// ✔ Claim storing in claims.json
+// ✔ Claim lookup by Claim ID
+// ✔ Unbreakable conversation flow
+// ============================================
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -8,28 +22,36 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// =====================
+// PATH SETUP
+// =====================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const POLICIES_FILE = path.join(__dirname, "policies.json");
 const CLAIMS_FILE = path.join(__dirname, "claims.json");
 
-
+// =====================
+// EXPRESS SETUP
+// =====================
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ---------- OpenAI client ----------
+// =====================
+// OPENAI SETUP
+// =====================
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
 if (!process.env.OPENAI_API_KEY) {
-  console.error("❌ Missing OPENAI_API_KEY in .env");
+  console.error("❌ Missing OPENAI_API_KEY");
   process.exit(1);
 }
 
-// ---------- Labels & required fields ----------
+// =====================
+// GLOBAL CONSTANTS
+// =====================
 const FIELD_LABELS = {
   claimant_name: "Claimant Name",
   policy_number: "Policy Number",
@@ -38,21 +60,24 @@ const FIELD_LABELS = {
   incident_location: "Incident Location",
   claim_amount: "Claim Amount",
   service_provider: "Service Provider",
-  description_of_loss: "Description of Loss",
+  description_of_loss: "Description of Loss"
 };
+
 const REQUIRED_FIELDS = Object.keys(FIELD_LABELS);
 
-// ---------- Session store ----------
+// =====================
+// SESSION STORE
+// =====================
 const sessions = {};
 
 function newSession() {
   return {
-    state: "awaiting_policy_number", // other states: confirm_new_claim, awaiting_claim_details, awaiting_missing, done, done_no_claim, awaiting_claim_id
+    state: "awaiting_policy_number",
     policyNumber: null,
     userDetails: null,
     claimData: {},
     missingFields: [],
-    lastClaimId: null,
+    lastClaimId: null
   };
 }
 
@@ -65,112 +90,102 @@ function generateSessionId() {
   return Math.random().toString(36).slice(2);
 }
 
-// ---------- JSON file helpers ----------
+// =====================
+// FILE HELPERS
+// =====================
 async function loadPolicies() {
   try {
-    const raw = await fs.readFile(POLICIES_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error("⚠ Could not read policies.json, using empty object:", err.message);
-    return {}; // no policies → all policy numbers invalid
+    return JSON.parse(await fs.readFile(POLICIES_FILE, "utf-8"));
+  } catch {
+    return {};
   }
 }
 
 async function loadClaims() {
   try {
-    const raw = await fs.readFile(CLAIMS_FILE, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.claims)) return { claims: [] };
-    return parsed;
-  } catch (err) {
-    console.error("⚠ Could not read claims.json, starting empty:", err.message);
+    const raw = JSON.parse(await fs.readFile(CLAIMS_FILE, "utf-8"));
+    return raw.claims ? raw : { claims: [] };
+  } catch {
     return { claims: [] };
   }
 }
 
-async function saveClaims(claimsObj) {
+async function saveClaims(data) {
+  await fs.writeFile(CLAIMS_FILE, JSON.stringify(data, null, 2), "utf-8");
+}
+
+// Create Claim ID
+async function generateClaimId() {
+  const data = await loadClaims();
+  const base = 1000 + (data.claims?.length || 0);
+  return `CLM-${base}`;
+}
+
+// =====================
+// JSON PARSER
+// =====================
+function safeParseJSON(msg) {
   try {
-    await fs.writeFile(CLAIMS_FILE, JSON.stringify(claimsObj, null, 2), "utf-8");
-  } catch (err) {
-    console.error("❌ Failed to write claims.json:", err.message);
+    return JSON.parse(
+      msg.content.replace(/```json/g, "").replace(/```/g, "").trim()
+    );
+  } catch {
+    return null;
   }
 }
 
-// ---------- Utility: parse JSON from OpenAI ----------
-function safeParseJSON(message) {
-  if (!message) return null;
-  if (message.parsed) return message.parsed;
+// =====================
+// VALIDATION
+// =====================
+function validateClaimJS(data) {
+  if (data.incident_date) {
+    const d = new Date(data.incident_date);
+    const now = new Date();
+    now.setHours(0,0,0,0);
 
-  if (message.content) {
-    try {
-      const cleaned = message.content
-        .replace(/```json/gi, "")
-        .replace(/```/g, "")
-        .trim();
-      return JSON.parse(cleaned);
-    } catch {
-      console.log("⚠ JSON parse failed from content");
+    if (d > now) {
+      return {
+        missing: ["incident_date"],
+        errorMessage:
+          "❌ The incident date cannot be in the future. Please enter a valid past date.",
+        cleaned: data
+      };
     }
   }
-  return null;
-}
 
-// ---------- Validation / Summary helpers ----------
-function validateClaimJS(data) {
-  const missing = REQUIRED_FIELDS.filter((f) => !data[f]);
+  const missing = REQUIRED_FIELDS.filter(f => !data[f]);
   return { missing, cleaned: data };
 }
 
 function formatSummary(data) {
-  return REQUIRED_FIELDS
-    .map((f) => `${FIELD_LABELS[f]}: ${data[f] ?? "Not Provided"}`)
-    .join("\n");
+  return REQUIRED_FIELDS.map(
+    f => `${FIELD_LABELS[f]}: ${data[f] ?? "Not Provided"}`
+  ).join("\n");
 }
 
-// ---------- Generate Claim ID ----------
-async function generateClaimId() {
-  const claimsObj = await loadClaims();
-  const base = 1000 + (claimsObj.claims?.length || 0);
-  return `CLM-${base}`;
-}
-
-// ---------- AI: Flexible initial extraction ----------
+// =====================
+// AI: CLAIM EXTRACTION
+// =====================
 async function extractClaimFlexible(text, defaults = {}) {
   try {
-    const completion = await client.chat.completions.create({
+    const out = await client.chat.completions.create({
       model: "gpt-4.1-mini",
       temperature: 0.1,
       messages: [
         {
           role: "system",
           content: `
-You extract claim fields from flexible user input.
-User may describe an incident in a paragraph, or use labels like:
-"Claimant Name: ", "Incident Date - ", etc.
-
-Return ONLY JSON with:
-
-{
-  "claimant_name": string | null,
-  "policy_number": string | null,
-  "claim_type": string | null,
-  "incident_date": string | null,
-  "incident_location": string | null,
-  "claim_amount": number | null,
-  "service_provider": string | null,
-  "description_of_loss": string | null
-}
-
-Infer values where possible. Use null if unknown.
+Extract claim fields from any kind of text (paragraph, labels, mixed).
+Return ONLY JSON with these keys:
+${JSON.stringify(REQUIRED_FIELDS)}
 `
         },
-        { role: "user", content: text },
-      ],
+        { role: "user", content: text }
+      ]
     });
 
-    const parsed = safeParseJSON(completion.choices[0].message);
-
-    const base = {
+    const parsed = safeParseJSON(out.choices[0].message);
+    return {
       claimant_name: null,
       policy_number: null,
       claim_type: null,
@@ -179,338 +194,314 @@ Infer values where possible. Use null if unknown.
       claim_amount: null,
       service_provider: null,
       description_of_loss: null,
+      ...(parsed || {}),
+      ...defaults
     };
-
-    return { ...base, ...(parsed || {}), ...defaults };
-  } catch (err) {
-    console.error("🔥 extractClaimFlexible error:", err.message);
-    return {
-      claimant_name: defaults.claimant_name ?? null,
-      policy_number: defaults.policy_number ?? null,
-      claim_type: null,
-      incident_date: null,
-      incident_location: null,
-      claim_amount: null,
-      service_provider: null,
-      description_of_loss: null,
-    };
+  } catch {
+    return defaults;
   }
 }
 
-// ---------- AI: Fill only missing fields ----------
-async function fillMissingAI(currentData, missing, text) {
+// =====================
+// AI: FILL MISSING
+// =====================
+async function fillMissingAI(current, missing, text) {
   try {
-    const completion = await client.chat.completions.create({
+    const out = await client.chat.completions.create({
       model: "gpt-4.1-mini",
       temperature: 0.1,
       messages: [
         {
           role: "system",
-          content: `
-You fill ONLY missing fields of a claim JSON using user's follow-up message.
-
-Rules:
-- Only update fields listed in "missingFields".
-- Never clear or overwrite existing non-null fields.
-- Return FULL JSON with the same 8 keys.
-`
+          content: "Fill ONLY the missing fields based on user message."
         },
         {
           role: "user",
           content: `
 Current JSON:
-${JSON.stringify(currentData, null, 2)}
+${JSON.stringify(current,null,2)}
 
-Missing fields:
-${JSON.stringify(missing)}
+Missing fields: ${missing}
 
 User message:
-"${text}"
+${text}
 
-Update only the clearly provided missing fields. Return ONLY the full JSON object.
+Return FULL updated JSON.
 `
-        },
-      ],
+        }
+      ]
     });
 
-    const parsed = safeParseJSON(completion.choices[0].message);
-    if (!parsed || typeof parsed !== "object") return currentData;
+    const parsed = safeParseJSON(out.choices[0].message);
+    if (!parsed) return current;
 
-    const updated = { ...currentData };
-    REQUIRED_FIELDS.forEach((f) => {
+    const updated = { ...current };
+    for (const f of REQUIRED_FIELDS) {
       if (parsed[f] !== undefined && parsed[f] !== null) {
         updated[f] = parsed[f];
       }
-    });
+    }
     return updated;
-  } catch (err) {
-    console.error("🔥 fillMissingAI error:", err.message);
-    return currentData;
+  } catch {
+    return current;
   }
 }
 
-// ---------- Policy number validation ----------
-function isPolicyExpired(validTillStr) {
-  if (!validTillStr) return false;
-  const today = new Date();
-  const validTill = new Date(validTillStr);
-  return validTill < new Date(today.toISOString().slice(0, 10));
+// =====================
+// CLAIM RETRIEVAL
+// =====================
+async function retrieveClaimById(id) {
+  const claims = await loadClaims();
+  return claims.claims.find(c => c.claimId?.toLowerCase() === id.toLowerCase()) || null;
 }
 
-// ---------- Claim retrieval by ID ----------
-async function retrieveClaimById(claimId) {
-  const claimsObj = await loadClaims();
-  const claim = claimsObj.claims.find(
-    (c) => c.claimId?.toLowerCase() === claimId.toLowerCase()
-  );
-  return claim || null;
+function formatClaimRetrieval(c) {
+  return `
+Claim ID: ${c.claimId}
+Policy Number: ${c.policy_number}
+Claimant Name: ${c.claimant_name}
+Claim Type: ${c.claim_type}
+Incident Date: ${c.incident_date}
+Incident Location: ${c.incident_location}
+Claim Amount: ${c.claim_amount}
+Service Provider: ${c.service_provider}
+Description of Loss: ${c.description_of_loss}
+Created At: ${c.createdAt}
+`;
 }
 
-function formatClaimRetrieval(claim) {
-  const lines = [
-    `Claim ID: ${claim.claimId}`,
-    `Policy Number: ${claim.policy_number}`,
-    `Claimant Name: ${claim.claimant_name}`,
-    `Claim Type: ${claim.claim_type}`,
-    `Incident Date: ${claim.incident_date}`,
-    `Incident Location: ${claim.incident_location}`,
-    `Claim Amount: ${claim.claim_amount}`,
-    `Service Provider: ${claim.service_provider}`,
-    `Description of Loss: ${claim.description_of_loss}`,
-    `Created At: ${claim.createdAt || "N/A"}`,
-  ];
-  return lines.join("\n");
-}
+// =====================
+// MAIN MESSAGE HANDLER
+// =====================
+async function handleMessage(session, msg) {
+  msg = msg.trim();
 
-// ---------- Main chat logic ----------
-async function handleMessage(session, message) {
-  const msg = message.trim();
-
-  // Global shortcuts
-  if (/^(restart|reset)$/i.test(msg)) {
-    Object.assign(session, newSession());
-    return (
-      "Conversation restarted.\n" +
-      "Please enter your policy number.\n" +
-      "You can also type 'retrieve claim' to look up an existing claim by Claim ID."
-    );
-  }
-
-  // Global entry for retrieval
-  if (
-    session.state === "awaiting_policy_number" &&
-    /retrieve/i.test(msg)
-  ) {
+  // --------------------------
+  // 🔥 GLOBAL COMMANDS
+  // --------------------------
+  if (/retrieve/i.test(msg)) {
     session.state = "awaiting_claim_id";
     return "Please enter your Claim ID (e.g., CLM-1001).";
   }
 
-  // ---------------- Retrieval flow ----------------
-  if (session.state === "awaiting_claim_id") {
-    const id = msg.toUpperCase().trim();
-    const claim = await retrieveClaimById(id);
-    if (!claim) {
-      return (
-        `I could not find any claim with ID ${id}.\n` +
-        `Please check the ID and try again, or type 'restart' to file a new claim.`
-      );
-    }
-    // Stay in same state so user can query more IDs
+  if (/restart/i.test(msg)) {
+    Object.assign(session, newSession());
     return (
-      `Here are the details for Claim ID ${id}:\n\n` +
-      formatClaimRetrieval(claim) +
-      "\n\nYou can enter another Claim ID or type 'restart' to start over."
+      "Conversation restarted.\n\n" +
+      "Please enter your Policy Number.\n" +
+      "Or type \"Retrieve Claim\" to check an existing claim."
     );
   }
 
-  //New claim flow :
+  // --------------------------
+  // CLAIM RETRIEVAL MODE
+  // --------------------------
+  if (session.state === "awaiting_claim_id") {
+    const claim = await retrieveClaimById(msg);
 
-  // STEP 1: awaiting policy number
+    if (!claim) {
+      return `❌ No claim found with ID "${msg}". Try again or type "restart".`;
+    }
+
+    return (
+      formatClaimRetrieval(claim) +
+      "\nYou may enter another Claim ID or type \"restart\"."
+    );
+  }
+
+  // --------------------------
+  // STEP 1: ENTER POLICY NUMBER
+  // --------------------------
   if (session.state === "awaiting_policy_number") {
-    const policyNumber = msg.toUpperCase();
     const policies = await loadPolicies();
-    const policy = policies[policyNumber];
+    const policy = policies[msg.toUpperCase()];
 
     if (!policy) {
-      return (
-        `The policy number "${policyNumber}" was not found.\n` +
-        `Please enter a valid policy number or type 'retrieve claim' to look up an existing claim.`
-      );
+      return `❌ Invalid policy number "${msg}". Please try again.`;
     }
 
-    // expiry check
-    if (isPolicyExpired(policy.validTill)) {
+    const expiry = new Date(policy.validTill);
+    const today = new Date();
+
+    if (expiry < today) {
       session.state = "done_no_claim";
-      session.policyNumber = policyNumber;
-      session.userDetails = policy;
       return (
-        `Policy Number: ${policyNumber}\n` +
-        `This policy has expired (Valid Till: ${policy.validTill}).\n` +
-        `New claims cannot be filed on an expired policy.\n` +
-        `If you think this is an error, please contact support.`
+        `Policy Number: ${msg}\n` +
+        `❌ This policy expired on ${policy.validTill}.\n` +
+        `New claims cannot be filed.`
       );
     }
 
-    // Valid & active policy
-    session.policyNumber = policyNumber;
+    // Valid Policy
+    session.policyNumber = msg.toUpperCase();
     session.userDetails = policy;
     session.state = "confirm_new_claim";
 
-    let details=`Thank you! Here are your policy details:\n`;
-    for(const[key, value] of Object.entries(policy)){
-      const label = key 
-          .replace(/([A-Z])/g," $1")
-          .replace(/_/g," ")
-          .replace(/^./,(c)=> c.toUpperCase());
-      details+=`${label}: ${value}\n`;
+    let details = "Thank you! Here are your policy details:\n";
+    for (const [k,v] of Object.entries(policy)) {
+      const label = k.replace(/_/g," ")
+        .replace(/([A-Z])/g," $1")
+        .replace(/^./, c=>c.toUpperCase());
+      details += `${label}: ${v}\n`;
     }
 
-    details+=`Policy Number : ${session.policyNumber}\n`;
-    details+=`\nWould you like to file a new claim? (yes/no)`;
-
-    return details;
+    return details + "\nWould you like to file a new claim? (yes/no)";
   }
 
-  // STEP 2: confirm new claim
+  // --------------------------
+  // STEP 2: CONFIRM NEW CLAIM
+  // --------------------------
   if (session.state === "confirm_new_claim") {
-    const lower = msg.toLowerCase();
-    if (lower.startsWith("y")) {
+    if (msg.toLowerCase().startsWith("y")) {
       session.state = "awaiting_claim_details";
       return (
-        "Great! Please provide your claim details in one message.\n\n" +
-        "You can either:\n" +
-        "• Describe the incident in a paragraph, OR\n" +
-        "• Provide labeled fields like:\n\n" +
+        "Great! Please provide your claim details.\n\n" +
+        "You may describe the incident OR use labeled fields.\n\n" +
+        "Example:\n" +
         "Claimant Name: \n" +
         "Incident Date: \n" +
         "Incident Location: \n" +
         "Claim Type: \n" +
         "Claim Amount: \n" +
         "Service Provider: \n" +
-        "Description of Loss: \n\n" +
-        "I will extract the required details automatically."
+        "Description of Loss: \n"
       );
     }
-    if (lower.startsWith("n")) {
+
+    if (msg.toLowerCase().startsWith("n")) {
       session.state = "done_no_claim";
-      return (
-        "Okay, we will not file a new claim right now.\n" +
-        "You can type 'restart' to start again or 'retrieve claim' to look up an existing claim."
-      );
+      return "Okay! Type \"restart\" anytime to start again.";
     }
-    return "Please answer 'yes' or 'no'.";
+
+    return "Please answer with yes or no.";
   }
 
-  // STEP 3: awaiting initial claim details
+  // --------------------------
+  // STEP 3: INITIAL CLAIM DETAILS
+  // --------------------------
   if (session.state === "awaiting_claim_details") {
     const defaults = {
-      claimant_name: session.userDetails?.name ?? null,
-      policy_number: session.policyNumber ?? null,
+      claimant_name: session.userDetails.name,
+      policy_number: session.policyNumber
     };
 
-    const claimData = await extractClaimFlexible(msg, defaults);
-    session.claimData = claimData;
+    const extracted = await extractClaimFlexible(msg, defaults);
+    session.claimData = extracted;
 
-    const { missing } = validateClaimJS(claimData);
+    const validation = validateClaimJS(extracted);
+
+    // ❌ Future date invalid
+    if (validation.errorMessage) {
+      session.missingFields = ["incident_date"];
+      session.state = "awaiting_missing";
+      return validation.errorMessage +
+        "\nExample: Incident Date: 10/10/2023";
+    }
+
+    const missing = validation.missing;
     session.missingFields = missing;
 
     if (missing.length === 0) {
-      // store and finish
       const claimId = await generateClaimId();
       session.lastClaimId = claimId;
 
-      const claimsObj = await loadClaims();
-      claimsObj.claims.push({
+      const allClaims = await loadClaims();
+      allClaims.claims.push({
         claimId,
-        ...claimData,
-        createdAt: new Date().toISOString(),
+        ...extracted,
+        createdAt: new Date().toISOString()
       });
-      await saveClaims(claimsObj);
+      await saveClaims(allClaims);
 
       session.state = "done";
 
       return (
-        formatSummary(claimData) +
+        formatSummary(extracted) +
         `\n\nYour Claim ID is: ${claimId}\n` +
-        "Thank you! Your claim has been recorded. Please wait for further communication."
+        "Your claim has been recorded.\n" +
+        "You may type \"retrieve claim\" anytime."
       );
     }
 
+    // Missing fields exist → ask only for those
     session.state = "awaiting_missing";
-
     return (
-      `Thank you! I captured most of your details.\n\n` +
-      `However, I still need:\n` +
-      `${missing.map((f) => FIELD_LABELS[f]).join(", ")}\n\n` +
-      `Please provide these missing details in one message. For example:\n` +
-      missing.map((f) => `${FIELD_LABELS[f]}: <value>`).join("\n")
+      "Thank you! I still need:\n" +
+      missing.map(f => FIELD_LABELS[f]).join(", ") +
+      "\nPlease provide these details."
     );
   }
 
-  // STEP 4: awaiting missing fields
+  // --------------------------
+  // STEP 4: MISSING FIELD LOOP
+  // --------------------------
   if (session.state === "awaiting_missing") {
-    const updated = await fillMissingAI(
-      session.claimData,
-      session.missingFields,
-      msg
-    );
-
+    const updated = await fillMissingAI(session.claimData, session.missingFields, msg);
     session.claimData = updated;
 
-    const { missing } = validateClaimJS(updated);
+    const validation = validateClaimJS(updated);
+
+    if (validation.errorMessage) {
+      session.missingFields = ["incident_date"];
+      return validation.errorMessage +
+        "\nExample: Incident Date: 10/10/2023";
+    }
+
+    const missing = validation.missing;
     session.missingFields = missing;
 
     if (missing.length === 0) {
       const claimId = await generateClaimId();
       session.lastClaimId = claimId;
 
-      const claimsObj = await loadClaims();
-      claimsObj.claims.push({
+      const allClaims = await loadClaims();
+      allClaims.claims.push({
         claimId,
         ...updated,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
       });
-      await saveClaims(claimsObj);
+      await saveClaims(allClaims);
 
       session.state = "done";
 
       return (
         formatSummary(updated) +
         `\n\nYour Claim ID is: ${claimId}\n` +
-        "Thank you! Your claim has been recorded. Please wait for further communication."
+        "Your claim has been successfully recorded.\n" +
+        "You may type \"retrieve claim\" anytime."
       );
     }
 
     return (
-      `Thanks! I still don't have complete information.\n\n` +
-      `Still missing:\n` +
-      `${missing.map((f) => FIELD_LABELS[f]).join(", ")}\n\n` +
-      `Please provide only these remaining details in your next message.`
+      "Still missing:\n" +
+      missing.map(f => FIELD_LABELS[f]).join(", ") +
+      "\nPlease provide these details."
     );
   }
 
-  // DONE states
-  if (session.state === "done_no_claim") {
-    return (
-      "We are not filing a claim right now.\n" +
-      "You can type 'restart' to start again or 'retrieve claim' to look up an existing claim."
-    );
-  }
-
+  // --------------------------
+  // DONE STATES
+  // --------------------------
   if (session.state === "done") {
     return (
-      "Your claim has already been recorded.\n" +
-      (session.lastClaimId
-        ? `Your Claim ID is ${session.lastClaimId}.\n`
-        : "") +
-      "You can type 'retrieve claim' to view a claim, or 'restart' to file a new one."
+      "Your claim is already recorded.\n" +
+      "You may type \"retrieve claim\" or \"restart\"."
     );
   }
 
-  return "I'm not sure what to do. Please type 'restart' to start over.";
+  if (session.state === "done_no_claim") {
+    return (
+      "We are not filing a claim.\n" +
+      "Type \"restart\" to begin again or \"retrieve claim\" to look up existing claims."
+    );
+  }
+
+  return "I'm not sure what you meant. Type \"restart\".";
 }
 
-// ---------- API endpoint ----------
+// ========================================
+// API ROUTE
+// ========================================
 app.post("/api/chat", async (req, res) => {
   try {
     let { message, sessionId } = req.body;
@@ -520,14 +511,15 @@ app.post("/api/chat", async (req, res) => {
     const reply = await handleMessage(session, message);
 
     res.json({ sessionId, reply });
+
   } catch (err) {
-    console.error("🔥 API error:", err);
-    res.status(500).json({ reply: "Internal server error" });
+    console.error("🔥 Server error:", err);
+    res.status(500).json({ reply: "Internal server error." });
   }
 });
 
-// ---------- Start server ----------
+// ========================================
+// START SERVER
+// ========================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 ClaimGenie API running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));
