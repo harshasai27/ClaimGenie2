@@ -529,5 +529,5 @@ app.post("/api/chat", async (req, res) => {
 // ---------- Start server ----------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 ClaimGenie backend (with all 5 features) running on port ${PORT}`);
+  console.log(`🚀 ClaimGenie API running on port ${PORT}`);
 });
