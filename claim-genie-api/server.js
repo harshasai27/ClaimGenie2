@@ -1,17 +1,3 @@
-// ============================================
-// ClaimGenie Backend (Full Working Version)
-// Supports:
-// ✔ Multiple policies JSON
-// ✔ Invalid/expired policy detection
-// ✔ Global "retrieve claim" command ANYTIME
-// ✔ Flexible AI extraction (labels + natural language)
-// ✔ Future incident date validation
-// ✔ Missing field loop
-// ✔ Claim storing in claims.json
-// ✔ Claim lookup by Claim ID
-// ✔ Unbreakable conversation flow
-// ============================================
-
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -22,18 +8,13 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// =====================
-// PATH SETUP
-// =====================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const POLICIES_FILE = path.join(__dirname, "policies.json");
 const CLAIMS_FILE = path.join(__dirname, "claims.json");
 
-// =====================
-// EXPRESS SETUP
-// =====================
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -90,9 +71,7 @@ function generateSessionId() {
   return Math.random().toString(36).slice(2);
 }
 
-// =====================
 // FILE HELPERS
-// =====================
 async function loadPolicies() {
   try {
     return JSON.parse(await fs.readFile(POLICIES_FILE, "utf-8"));
@@ -121,9 +100,7 @@ async function generateClaimId() {
   return `CLM-${base}`;
 }
 
-// =====================
 // JSON PARSER
-// =====================
 function safeParseJSON(msg) {
   try {
     return JSON.parse(
@@ -134,9 +111,7 @@ function safeParseJSON(msg) {
   }
 }
 
-// =====================
 // VALIDATION
-// =====================
 function validateClaimJS(data) {
   if (data.incident_date) {
     const d = new Date(data.incident_date);
@@ -163,9 +138,6 @@ function formatSummary(data) {
   ).join("\n");
 }
 
-// =====================
-// AI: CLAIM EXTRACTION
-// =====================
 async function extractClaimFlexible(text, defaults = {}) {
   try {
     const out = await client.chat.completions.create({
@@ -202,9 +174,6 @@ ${JSON.stringify(REQUIRED_FIELDS)}
   }
 }
 
-// =====================
-// AI: FILL MISSING
-// =====================
 async function fillMissingAI(current, missing, text) {
   try {
     const out = await client.chat.completions.create({
@@ -247,9 +216,6 @@ Return FULL updated JSON.
   }
 }
 
-// =====================
-// CLAIM RETRIEVAL
-// =====================
 async function retrieveClaimById(id) {
   const claims = await loadClaims();
   return claims.claims.find(c => c.claimId?.toLowerCase() === id.toLowerCase()) || null;
@@ -270,15 +236,10 @@ Created At: ${c.createdAt}
 `;
 }
 
-// =====================
-// MAIN MESSAGE HANDLER
-// =====================
+
 async function handleMessage(session, msg) {
   msg = msg.trim();
 
-  // --------------------------
-  // 🔥 GLOBAL COMMANDS
-  // --------------------------
   if (/retrieve/i.test(msg)) {
     session.state = "awaiting_claim_id";
     return "Please enter your Claim ID (e.g., CLM-1001).";
@@ -293,9 +254,8 @@ async function handleMessage(session, msg) {
     );
   }
 
-  // --------------------------
+
   // CLAIM RETRIEVAL MODE
-  // --------------------------
   if (session.state === "awaiting_claim_id") {
     const claim = await retrieveClaimById(msg);
 
@@ -309,9 +269,7 @@ async function handleMessage(session, msg) {
     );
   }
 
-  // --------------------------
   // STEP 1: ENTER POLICY NUMBER
-  // --------------------------
   if (session.state === "awaiting_policy_number") {
     const policies = await loadPolicies();
     const policy = policies[msg.toUpperCase()];
@@ -348,9 +306,7 @@ async function handleMessage(session, msg) {
     return details + "\nWould you like to file a new claim? (yes/no)";
   }
 
-  // --------------------------
   // STEP 2: CONFIRM NEW CLAIM
-  // --------------------------
   if (session.state === "confirm_new_claim") {
     if (msg.toLowerCase().startsWith("y")) {
       session.state = "awaiting_claim_details";
@@ -376,9 +332,7 @@ async function handleMessage(session, msg) {
     return "Please answer with yes or no.";
   }
 
-  // --------------------------
   // STEP 3: INITIAL CLAIM DETAILS
-  // --------------------------
   if (session.state === "awaiting_claim_details") {
     const defaults = {
       claimant_name: session.userDetails.name,
@@ -432,9 +386,7 @@ async function handleMessage(session, msg) {
     );
   }
 
-  // --------------------------
   // STEP 4: MISSING FIELD LOOP
-  // --------------------------
   if (session.state === "awaiting_missing") {
     const updated = await fillMissingAI(session.claimData, session.missingFields, msg);
     session.claimData = updated;
@@ -479,9 +431,7 @@ async function handleMessage(session, msg) {
     );
   }
 
-  // --------------------------
   // DONE STATES
-  // --------------------------
   if (session.state === "done") {
     return (
       "Your claim is already recorded.\n" +
@@ -499,9 +449,7 @@ async function handleMessage(session, msg) {
   return "I'm not sure what you meant. Type \"restart\".";
 }
 
-// ========================================
 // API ROUTE
-// ========================================
 app.post("/api/chat", async (req, res) => {
   try {
     let { message, sessionId } = req.body;
@@ -518,8 +466,5 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// ========================================
-// START SERVER
-// ========================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));

@@ -80,6 +80,18 @@ export default function ClaimGenie() {
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={handleKey}
                     />
+
+                    <label className="cg-upload-btn"> +
+                        <input
+                            type="file"
+                            onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                    console.log("Uploaded : ", file.name);
+                                }
+                            }}
+                        />
+                    </label>
                     <button className="cg-send-btn" onClick={sendMessage}>▶</button>
                 </div>
             </div>
