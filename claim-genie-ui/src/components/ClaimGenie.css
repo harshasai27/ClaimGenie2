@@ -156,11 +156,19 @@
 }
 /* Chat Bubble */
 .cg-bubble {
- max-width: 65%;
+ /* max-width: 65%;
  padding: 10px 14px;
  border-radius: 12px;
  font-size: 14px;
- line-height: 1.4;
+ line-height: 1.4; */
+ max-width: 80%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 1px;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  text-align: left;
 }
 /* Bot bubble */
 .cg-bubble.bot {
