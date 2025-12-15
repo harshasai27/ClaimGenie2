@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./ClaimGenie.css";
 
-//const API_URL = "https://legendary-space-carnival-gg4vwjqxgj5cwr6p-5000.app.github.dev/api/chat";
-const API_URL = "https://zany-engine-97w7wpjg94w93xgjj-5000.app.github.dev/api/chat";
+const API_URL = "https://legendary-space-carnival-gg4vwjqxgj5cwr6p-5000.app.github.dev/api/chat";
+//const API_URL = "https://zany-engine-97w7wpjg94w93xgjj-5000.app.github.dev/api/chat";
 
 
 export default function ClaimGenie() {
@@ -66,11 +66,28 @@ export default function ClaimGenie() {
                 <div className="cg-header">ClaimGenie</div>
 
                 <div className="cg-messages">
-                    {messages.map((m, i) => (
+                    {/* {messages.map((m, i) => (
                         <div key={i} className={`cg-bubble ${m.from}`}>
                             {m.text}
                         </div>
-                    ))}
+                    ))} */}
+
+                    {messages.map((m, i) => (
+<div key={i} className={`cg-message-row ${m.from}`}>
+   {/* Bot Avatar */}
+   {m.from === "bot" && (
+<div className="cg-avatar bot-avatar">🤖</div>
+   )}
+   {/* Message Bubble */}
+<div className={`cg-bubble ${m.from}`}>
+     {m.text}
+</div>
+   {/* User Avatar */}
+   {m.from === "user" && (
+<div className="cg-avatar user-avatar">👤</div>
+   )}
+</div>
+))}
                     <div ref={bottomRef} />
                 </div>
 

@@ -36,7 +36,7 @@
   flex-direction: column;
 }
 
-.cg-bubble {
+/* .cg-bubble {
   max-width: 80%;
   padding: 10px 12px;
   border-radius: 12px;
@@ -57,7 +57,7 @@
   align-self: flex-end;
   background: #d2f8d2;
   border-bottom-right-radius: 0;
-}
+} */
 
 .cg-input-row {
   display: flex;
@@ -119,4 +119,57 @@
 }
 .cg-upload-btn:hover {
  transform: scale(1.1);
+}
+
+
+/* Message Row */
+.cg-message-row {
+ display: flex;
+ align-items: flex-end;
+ margin: 8px 0;
+}
+/* Alignment */
+.cg-message-row.bot {
+ justify-content: flex-start;
+}
+.cg-message-row.user {
+ justify-content: flex-end;
+}
+/* Avatar */
+.cg-avatar {
+ width: 36px;
+ height: 36px;
+ border-radius: 50%;
+ font-size: 20px;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ margin: 0 6px;
+ background: #f0f0f0;
+}
+/* Optional custom colors */
+.bot-avatar {
+ background: #e6f2ff;
+}
+.user-avatar {
+ background: #e8ffe6;
+}
+/* Chat Bubble */
+.cg-bubble {
+ max-width: 65%;
+ padding: 10px 14px;
+ border-radius: 12px;
+ font-size: 14px;
+ line-height: 1.4;
+}
+/* Bot bubble */
+.cg-bubble.bot {
+ background: #f5f7fa;
+ border-top-left-radius: 0;
+}
+/* User bubble */
+.cg-bubble.user {
+ background: #007bff;
+ color: white;
+ border-top-right-radius: 0;
 }
