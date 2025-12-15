@@ -66,6 +66,26 @@
   background: #f2f2f2;
 }
 
+.cg-upload-btn{
+  width: 36px;
+  height: 36px;
+  background: #ffffff;
+  border:1px solid #ccc;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  cursor: pointer;
+  margin-right: 5px;
+  margin-left:5px;
+  padding-bottom: 3px;
+}
+
+.cg-upload-btn input{
+  display: none;
+}
+
 .cg-input {
   flex: 1;
   padding: 10px 14px;
