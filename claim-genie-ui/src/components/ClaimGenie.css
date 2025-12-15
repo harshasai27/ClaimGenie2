@@ -66,7 +66,7 @@
   background: #f2f2f2;
 }
 
-.cg-upload-btn{
+/* .cg-upload-btn{
   width: 36px;
   height: 36px;
   background: #ffffff;
@@ -84,7 +84,7 @@
 
 .cg-upload-btn input{
   display: none;
-}
+} */
 
 .cg-input {
   flex: 1;
@@ -108,4 +108,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.cg-upload-btn {
+ cursor: pointer;
+ display: flex;
+ align-items: center;
+ color: #6a1b9a;
+ margin-right: 1px;
+}
+.cg-upload-btn:hover {
+ transform: scale(1.1);
 }
