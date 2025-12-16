@@ -7,8 +7,18 @@
         "sumInsured":"3,00,000",
         "vehicleModel":"Royal Enfield - Hunter 350",
         "registrationNumber":"AB01AB1234",
-        "email":"john@gmail.com"
-    },
+        "engineNumber":"KL12CD3456",
+        "chassisNumber":"CHS1234567890",
+        "yearOfManufacture":"2021",
+        "fuelType":"Petrol",
+        "email":"john@gmail.com",
+        "policyStatus":"Active",
+        "phoneNumber":"1234567890",
+        "address":"123, MG Road, Hyderabad",
+        "coverage_ownDamage":"Yes",
+        "coverage_thirdParty":"Yes",
+        "coverage_personalAccident":"Yes"
+           },
     "P4567" : {
         "name":"Peter",
         "policyType":"Health Insurance",
