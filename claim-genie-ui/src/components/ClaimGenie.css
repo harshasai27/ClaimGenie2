@@ -319,11 +319,11 @@ box-shadow: 0 4px 10px rgba(0,0,0,0.2);
   line-height: 1.4;
   white-space: pre-wrap;
   text-align: left; */
- max-width: 78%;
+ max-width: 110%;
  padding: 10px 12px;
  border-radius: 14px;
  line-height: 1.45;
- font-size: 14px;
+ font-size: 12px;
  white-space: pre-line; /* keeps your \n\n formatting */
  /* box-shadow: 0 10px 26px rgba(0,0,0,0.12); */
  box-shadow: 

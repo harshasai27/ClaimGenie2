@@ -379,9 +379,10 @@ async function handleMessage(session, msg) {
 
     // Missing fields exist → ask only for those
     session.state = "awaiting_missing";
+   
     return (
       "Thank you! I still need:\n" +
-      missing.map(f => FIELD_LABELS[f]).join(", ") +
+     missing.map(f => '• ' + FIELD_LABELS[f]).join("\n") +
       "\nPlease provide these details."
     );
   }
@@ -426,7 +427,7 @@ async function handleMessage(session, msg) {
 
     return (
       "Still missing:\n" +
-      missing.map(f => FIELD_LABELS[f]).join(", ") +
+       missing.map(f => '• ' + FIELD_LABELS[f]).join("\n") +
       "\nPlease provide these details."
     );
   }
