@@ -5,24 +5,28 @@ import "./ClaimGenie.css";
 const API_URL = "https://legendary-space-carnival-gg4vwjqxgj5cwr6p-5000.app.github.dev/api/chat";
 //const API_URL = "https://zany-engine-97w7wpjg94w93xgjj-5000.app.github.dev/api/chat";
 
+const timeFmt=new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit', minute: '2-digit'
+});
+const formatTime=(ts) => timeFmt.format(new Date(ts));
 
 export default function ClaimGenie() {
-      const getTime = () => {
-        const now = new Date();
-        return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const addMsg=(from, text) => {
+        const ts=Date.now();
+        return {id:crypto.randomUUID(), from, text, time:formatTime(ts) };
     };
     const [messages, setMessages] = useState([
-        {
-            from: "bot",
-            text:
+        addMsg(            
+            "bot",
                 "Hi, I’m ClaimGenie 👋\n\n" +
                 "I can help you with:\n" +
                 "• Filing a new insurance claim\n" +
                 "• Check status of an existing claim\n\n" +
                 "👉 Enter your Policy Number to file a new claim\n" +
                 "👉 Or type \"Retrieve Claim\" to check an existing one",
-                time:getTime()
-        }
+                
+        )
     ]);
 
     const [input, setInput] = useState("");
@@ -39,7 +43,8 @@ export default function ClaimGenie() {
         const text = input.trim();
         setInput("");
 
-        setMessages(prev => [...prev, { from: "user", text, time:getTime() }]);
+        // setMessages(prev => [...prev, { from: "user", text, time:getTime() }]);
+        setMessages(prev => [...prev, addMsg("user", text)]);
 
         try {
             const res = await axios.post(API_URL, {
@@ -49,11 +54,16 @@ export default function ClaimGenie() {
 
             if (!sessionId) setSessionId(res.data.sessionId);
 
-            setMessages(prev => [...prev, { from: "bot", text: res.data.reply ,time:getTime()}]);
+            // setMessages(prev => [...prev, { from: "bot", text: res.data.reply ,time:getTime()}]);
+            setMessages(prev => [...prev, addMsg("bot", res.data.reply)]);
         } catch {
+            // setMessages(prev => [
+            //     ...prev,
+            //     { from: "bot", text: "Server error. Please try again." ,time:getTime()}
+            // ]);
             setMessages(prev => [
                 ...prev,
-                { from: "bot", text: "Server error. Please try again." ,time:getTime()}
+                addMsg("bot", "Server error. Please try again.")
             ]);
         }
     };
