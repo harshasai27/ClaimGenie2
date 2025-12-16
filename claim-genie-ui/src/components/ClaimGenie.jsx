@@ -7,6 +7,10 @@ const API_URL = "https://legendary-space-carnival-gg4vwjqxgj5cwr6p-5000.app.gith
 
 
 export default function ClaimGenie() {
+      const getTime = () => {
+        const now = new Date();
+        return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
     const [messages, setMessages] = useState([
         {
             from: "bot",
@@ -16,7 +20,8 @@ export default function ClaimGenie() {
                 "• Filing a new insurance claim\n" +
                 "• Check status of an existing claim\n\n" +
                 "👉 Enter your Policy Number to file a new claim\n" +
-                "👉 Or type \"Retrieve Claim\" to check an existing one"
+                "👉 Or type \"Retrieve Claim\" to check an existing one",
+                time:getTime()
         }
     ]);
 
@@ -34,7 +39,7 @@ export default function ClaimGenie() {
         const text = input.trim();
         setInput("");
 
-        setMessages(prev => [...prev, { from: "user", text }]);
+        setMessages(prev => [...prev, { from: "user", text, time:getTime() }]);
 
         try {
             const res = await axios.post(API_URL, {
@@ -44,11 +49,11 @@ export default function ClaimGenie() {
 
             if (!sessionId) setSessionId(res.data.sessionId);
 
-            setMessages(prev => [...prev, { from: "bot", text: res.data.reply }]);
+            setMessages(prev => [...prev, { from: "bot", text: res.data.reply ,time:getTime()}]);
         } catch {
             setMessages(prev => [
                 ...prev,
-                { from: "bot", text: "Server error. Please try again." }
+                { from: "bot", text: "Server error. Please try again." ,time:getTime()}
             ]);
         }
     };
@@ -60,10 +65,16 @@ export default function ClaimGenie() {
         }
     };
 
+  
+
     return (
         <div className="cg-app">
             <div className="cg-chat-card">
-                <div className="cg-header">ClaimGenie</div>
+                <div className="cg-header">
+                    <div className="cg-title">
+                    ClaimGenie</div>
+                    <div className="cg-subtitle">Your AI Insurance Assistant</div>
+                </div>
 
                 <div className="cg-messages">
                     {/* {messages.map((m, i) => (
@@ -79,9 +90,14 @@ export default function ClaimGenie() {
 <div className="cg-avatar bot-avatar">🤖</div>
    )}
    {/* Message Bubble */}
+   <div className={`cg-msg-block ${m.from}`}>
+
 <div className={`cg-bubble ${m.from}`}>
      {m.text}
 </div>
+<div className={`cg-time ${m.from}`}>
+     {m.time}
+</div> </div>
    {/* User Avatar */}
    {m.from === "user" && (
 <div className="cg-avatar user-avatar">👤</div>
