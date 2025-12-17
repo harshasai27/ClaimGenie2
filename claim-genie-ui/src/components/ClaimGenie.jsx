@@ -49,7 +49,7 @@ export default function ClaimGenie() {
         try {
             const res = await axios.post(API_URL, {
                 message: text,
-                sessionId
+                sessionId : sessionId
             });
 
             if (!sessionId) setSessionId(res.data.sessionId);

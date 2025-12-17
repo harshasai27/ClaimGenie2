@@ -10,6 +10,8 @@
       "claim_amount": 5000,
       "service_provider": "local garage",
       "description_of_loss": "bike accident near madhapur",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
       "createdAt": "2025-12-10T11:18:57.293Z"
     },
     {
@@ -22,6 +24,8 @@
       "claim_amount": "5000",
       "service_provider": "local garage",
       "description_of_loss": "bike accident repair costs",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
       "createdAt": "2025-12-11T09:50:31.776Z"
     },
     {
@@ -34,6 +38,8 @@
       "claim_amount": "10000",
       "service_provider": "local garage",
       "description_of_loss": "head light and bumper damage",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
       "createdAt": "2025-12-11T09:57:07.599Z"
     },
     {
@@ -46,6 +52,8 @@
       "claim_amount": "2000",
       "service_provider": "Sri motors",
       "description_of_loss": "bike accident and repair costs",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
       "createdAt": "2025-12-12T12:48:43.960Z"
     },
     {
@@ -58,7 +66,121 @@
       "claim_amount": "5000",
       "service_provider": "Sri Motors",
       "description_of_loss": "front bumper and headlight are damaged",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
       "createdAt": "2025-12-15T06:50:49.117Z"
+    },
+    {
+      "claimId": "CLM-1005",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "Motor",
+      "incident_date": "2025-10-10",
+      "incident_location": "Hyderabad",
+      "claim_amount": 3000,
+      "service_provider": "Honda",
+      "description_of_loss": "headlight",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
+      "createdAt": "2025-12-16T08:14:34.892Z"
+    },
+    {
+      "claimId": "CLM-1007",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "MOTOR",
+      "incident_date": "10/10/2025",
+      "incident_location": "Hyderabad",
+      "claim_amount": "4000",
+      "service_provider": "TATA",
+      "description_of_loss": "headlight damage",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
+      "createdAt": "2025-12-16T12:58:44.537Z"
+    },
+    {
+      "claimId": "CLM-1007",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "bike accident",
+      "incident_date": "2025-10-20",
+      "incident_location": "kondapur",
+      "claim_amount": 5000,
+      "service_provider": "TATA",
+      "description_of_loss": "headlight damage",
+      "claim_status": "Filed",
+      "pending_with": "Claims Verification Team",
+      "createdAt": "2025-12-16T17:32:05.661Z"
+    },
+    {
+      "claimId": "CLM-1008",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "bike accident",
+      "incident_date": "2025-10-01",
+      "incident_location": "MG road",
+      "claim_amount": 5000,
+      "service_provider": "Honda",
+      "description_of_loss": "Front mudguard",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
+      "createdAt": "2025-12-16T17:51:57.637Z"
+    },
+    {
+      "claimId": "CLM-1009",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "Bike Accident",
+      "incident_date": "2025-10-20",
+      "incident_location": "Kondapur",
+      "claim_amount": 5000,
+      "service_provider": "TATA Motors",
+      "description_of_loss": "Headlight damage",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
+      "createdAt": "2025-12-16T18:03:49.144Z"
+    },
+    {
+      "claimId": "CLM-1010",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "Motor",
+      "incident_date": "2025-10-10",
+      "incident_location": "Hyd",
+      "claim_amount": 5000,
+      "service_provider": "Honda",
+      "description_of_loss": "Front tyre",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
+      "createdAt": "2025-12-17T04:24:31.611Z"
+    },
+    {
+      "claimId": "CLM-1011",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "Bike",
+      "incident_date": "2025-10-20",
+      "incident_location": "Hyderabad",
+      "claim_amount": 2000,
+      "service_provider": "Honda",
+      "description_of_loss": "Headlight",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
+      "createdAt": "2025-12-17T04:42:55.603Z"
+    },
+    {
+      "claimId": "CLM-1012",
+      "claimant_name": "John",
+      "policy_number": "P12345",
+      "claim_type": "Motor",
+      "incident_date": "2025-10-20",
+      "incident_location": "Hyderabad",
+      "claim_amount": 5000,
+      "service_provider": "Honda",
+      "description_of_loss": "headlight",
+      "claim_status": "In Review",
+      "pending_with": "Claims Verification Team",
+      "createdAt": "2025-12-17T05:40:00.780Z"
     }
   ]
 }
