@@ -243,30 +243,52 @@ async function fillMissing(current, missing, text) {
 /* =========================
    VALIDATION
 ========================= */
-async function validateClaim(data) {
+async function validateClaim(data, policyNumber) {
+  let errors = {
+    missing: [],
+    errorMessage: []
+  };
   if (data.incident_date) {
     const norm = await normalizeDate(data.incident_date);
-    if (norm.ambiguous)
-      return { error: "❓ Incident Date is ambiguous. Please use YYYY-MM-DD.", missing: ["incident_date"] };
-    if (norm.invalid)
-      return { error: "❌ Incident Date is invalid.", missing: ["incident_date"] };
-
+    
+    if (norm.ambiguous) {
+      errors.missing.push("incident_date");
+      errors.errorMessage.push(
+        "❓ Incident Date is ambiguous. Please use YYYY-MM-DD.");
+    }
+    if (norm.invalid) {
+      errors.missing.push("incident_date");
+      errors.errorMessage.push(
+        "❌ Incident Date is invalid.");
+    }
     const d = new Date(norm.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (d > today)
-      return { error: "❌ Incident Date cannot be in the future.", missing: ["incident_date"] };
+    if (d > today) {
+      errors.missing.push("incident_date");
+      errors.errorMessage.push(
+        "❌ Incident Date cannot be in the future.");
+    }
 
     data.incident_date = norm.date;
   }
 
   if (data.claim_amount) {
-    const amt = Number(data.claim_amount);
-    data.claim_amount = isNaN(amt) ? null : amt;
+    data.claim_amount = parseFloat(("" + data.claim_amount).replaceAll(",",""));
+    const policy = (await loadPolicies())[policyNumber];
+    policy.sumInsured = parseFloat(policy.sumInsured.replaceAll(",",""));
+
+
+    if (data.claim_amount > policy.sumInsured) {
+      errors.missing.push("claim_amount");
+      errors.errorMessage.push(
+        "❌ The claim amount cannot be greater than the Sum Insured. Please enter a valid claim amount.");
+  }
   }
 
+
   const missing = REQUIRED_FIELDS.filter(f => !data[f]);
-  return { missing };
+  return { missing: Array.from(new Set(...missing, ...errors.missing)), error: errors.errorMessage.join("\n") };
 }
 
 /* =========================
@@ -399,7 +421,7 @@ async function handleMessage(session, msg) {
       claimant_name: session.userDetails.name
     });
 
-    const v = await validateClaim(session.claimData);
+    const v = await validateClaim(session.claimData, session.policyNumber);
     if (v.error) {
       session.missingFields = v.missing;
       session.state = "awaiting_missing";
@@ -441,7 +463,7 @@ async function handleMessage(session, msg) {
 
   if (session.state === "awaiting_missing") {
     session.claimData = await fillMissing(session.claimData, session.missingFields, msg);
-    const v = await validateClaim(session.claimData);
+    const v = await validateClaim(session.claimData, session.policyNumber);
     if (v.error) return v.error;
 
     if (!v.missing.length) {
